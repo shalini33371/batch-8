@@ -1,0 +1,95 @@
+!pip install pandas numpy matplotlib seaborn scikit-learn
+
+# === STEP 2: Import Libraries ===
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix
+from google.colab import files
+import io
+
+# === STEP 3: Upload Dataset ===
+print("📂 Please upload your traffic accident dataset (CSV format):")
+uploaded = files.upload()
+
+# Load the first uploaded file
+filename = list(uploaded.keys())[0]
+df = pd.read_csv(io.BytesIO(uploaded[filename]))
+
+# Preview the data
+print("✅ Dataset loaded successfully!")
+print("Shape:", df.shape)
+print(df.head())
+
+# === STEP 4: Preprocessing ===
+# Drop common non-informative columns
+drop_cols = ['ID', 'Accident_Index', 'Date', 'Time']
+df.drop(columns=[col for col in drop_cols if col in df.columns], inplace=True, errors='ignore')
+
+# Fill missing values
+df.fillna(method='ffill', inplace=True)
+
+# Encode categorical variables
+label_encoders = {}
+for col in df.select_dtypes(include='object').columns:
+    le = LabelEncoder()
+    df[col] = le.fit_transform(df[col])
+    label_encoders[col] = le
+
+# Detect the target column
+target_column = 'Accident_Severity' if 'Accident_Severity' in df.columns else df.columns[-1]
+print(f"\n🎯 Detected target column: {target_column}")
+
+# === STEP 5: Exploratory Data Analysis ===
+# Plot class distribution
+sns.countplot(x=target_column, data=df)
+plt.title("Accident Severity Distribution")
+plt.xlabel("Severity Level")
+plt.ylabel("Count")
+plt.show()
+
+# Correlation heatmap
+plt.figure(figsize=(12, 8))
+sns.heatmap(df.corr(), annot=False, cmap='coolwarm')
+plt.title("Correlation Heatmap")
+plt.show()
+
+# === STEP 6: Model Training & Evaluation ===
+# Define features and target
+X = df.drop(target_column, axis=1)
+y = df[target_column]
+
+# Scale features
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.3, random_state=42)
+
+# Train model
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# Predict
+y_pred = model.predict(X_test)
+
+# Evaluation
+print("\n📊 Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+print("\n📝 Classification Report:")
+print(classification_report(y_test, y_pred))
+
+# === STEP 7: Feature Importance ===
+importances = model.feature_importances_
+indices = np.argsort(importances)[-10:]
+
+plt.figure(figsize=(10, 6))
+plt.title("Top 10 Important Features")
+plt.barh(range(len(indices)), importances[indices], align='center')
+plt.yticks(range(len(indices)), [X.columns[i] for i in indices])
+plt.xlabel("Feature Importance Score")
+plt.show()
